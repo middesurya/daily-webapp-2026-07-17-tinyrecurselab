@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TinyRecurseLab — train a tiny recursive reasoner in your browser</title>
+<meta name="description" content="Interactive lab on Tiny Recursive Models (TRM) & Hierarchical Reasoning Models (HRM). Train a real recursive reasoner on 4x4 Sudoku with a from-scratch autograd engine — no libraries, all in-browser.">
+<style>
+:root{
+  --bg:#080b12; --bg2:#0d1220; --panel:#111827; --panel2:#0f1524;
+  --ink:#e8edf6; --mut:#8b98b0; --dim:#5b6982;
+  --a1:#6ee7ff; --a2:#b57bff; --a3:#5df2a0; --a4:#ffcf6e; --a5:#ff7ab0;
+  --line:#1e2940; --good:#5df2a0; --bad:#ff7086; --grid:#233150;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:radial-gradient(1200px 700px at 70% -10%,#141c30 0%,var(--bg) 55%);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--a1);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1120px;margin:0 auto;padding:26px 18px 90px}
+header.hero{padding:14px 4px 8px}
+.badge{display:inline-flex;gap:7px;align-items:center;font:600 11px/1 var(--mono);color:var(--a2);background:rgba(181,123,255,.08);border:1px solid rgba(181,123,255,.25);padding:6px 10px;border-radius:999px;letter-spacing:.06em;text-transform:uppercase}
+h1{font-size:clamp(28px,5vw,46px);line-height:1.03;margin:14px 0 8px;letter-spacing:-.02em}
+h1 .grad{background:linear-gradient(92deg,var(--a1),var(--a2) 60%,var(--a5));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--mut);font-size:16.5px;max-width:760px;line-height:1.55}
+.cite{margin-top:12px;font:500 12.5px/1.5 var(--mono);color:var(--dim)}
+.cite b{color:var(--a3)}
+.statbar{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 6px}
+.stat{flex:1;min-width:150px;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat .k{font:700 20px/1 var(--mono);color:var(--a1)}
+.stat .l{font-size:11.5px;color:var(--mut);margin-top:5px;letter-spacing:.02em}
+nav.tabs{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:6px;padding:12px 0;margin:14px 0 6px;background:linear-gradient(180deg,var(--bg) 60%,rgba(8,11,18,0));backdrop-filter:blur(4px)}
+.tab{cursor:pointer;font:600 13px/1 var(--sans);color:var(--mut);background:var(--panel);border:1px solid var(--line);padding:10px 13px;border-radius:10px;display:flex;gap:8px;align-items:center;transition:.15s}
+.tab:hover{color:var(--ink);border-color:#2c3a5c}
+.tab.on{color:#08101c;background:linear-gradient(120deg,var(--a1),var(--a2));border-color:transparent;box-shadow:0 4px 18px rgba(110,231,255,.2)}
+.tab .n{font:700 11px/1 var(--mono);opacity:.6}
+.module{display:none;animation:fade .25s ease}
+.module.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;padding:20px;margin:14px 0}
+.card h2{margin:0 0 4px;font-size:20px;letter-spacing:-.01em}
+.card h2 .tag{font:600 11px/1 var(--mono);color:var(--a4);background:rgba(255,207,110,.09);border:1px solid rgba(255,207,110,.22);padding:4px 8px;border-radius:6px;margin-left:8px;vertical-align:middle}
+.lead{color:var(--mut);font-size:14.5px;line-height:1.6;margin:6px 0 16px;max-width:820px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid12{display:grid;grid-template-columns:340px 1fr;gap:18px}
+@media(max-width:860px){.grid2,.grid12{grid-template-columns:1fr}}
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-bottom:14px}
+.ctl{display:flex;flex-direction:column;gap:6px;min-width:120px}
+.ctl label{font:600 11px/1 var(--mono);color:var(--mut);letter-spacing:.04em;text-transform:uppercase}
+.ctl label .v{color:var(--a1);float:right}
+input[type=range]{-webkit-appearance:none;appearance:none;height:5px;border-radius:5px;background:var(--grid);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--a1);cursor:pointer;box-shadow:0 0 0 4px rgba(110,231,255,.15)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border:none;border-radius:50%;background:var(--a1);cursor:pointer}
+select,button{font-family:var(--sans)}
+select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+.btn{cursor:pointer;border:none;border-radius:9px;padding:10px 16px;font:700 13px/1 var(--sans);color:#08101c;background:linear-gradient(120deg,var(--a1),var(--a3));transition:.15s;box-shadow:0 3px 14px rgba(93,242,160,.16)}
+.btn:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+.btn.sec{background:var(--panel);color:var(--ink);border:1px solid var(--line);box-shadow:none}
+.btn.pur{background:linear-gradient(120deg,var(--a2),var(--a5))}
+.btn.ghost{background:transparent;color:var(--a1);border:1px solid rgba(110,231,255,.3);box-shadow:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+canvas{display:block;max-width:100%}
+.panelbox{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}
+.mini{font:600 11px/1 var(--mono);color:var(--dim);letter-spacing:.03em;text-transform:uppercase;margin-bottom:8px}
+.kv{display:flex;justify-content:space-between;font:500 13px/1.7 var(--mono);color:var(--mut);border-bottom:1px dashed var(--line);padding:3px 0}
+.kv b{color:var(--ink)}
+.sud{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;width:220px;aspect-ratio:1}
+.cellwrap{width:236px;margin:0 auto}
+.cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font:700 22px/1 var(--mono);border-radius:6px;background:#0b1120;border:1px solid var(--grid);position:relative}
+.cell.given{color:var(--ink);background:#16203a;border-color:#2a3a5e}
+.cell.pred{color:#08101c}
+.cell.box{box-shadow:inset 0 0 0 1px rgba(124,140,180,.14)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:10px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
+.note{font-size:13px;color:var(--mut);line-height:1.6;background:rgba(110,231,255,.05);border-left:3px solid var(--a1);padding:10px 14px;border-radius:0 8px 8px 0;margin-top:12px}
+.note.warn{background:rgba(255,207,110,.06);border-color:var(--a4)}
+.note.ok{background:rgba(93,242,160,.06);border-color:var(--a3)}
+table.paper{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+table.paper th,table.paper td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+table.paper th{color:var(--mut);font:600 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.04em}
+table.paper td{font-family:var(--mono);color:var(--ink)}
+table.paper tr td:first-child{color:var(--a1)}
+.arch{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;padding:8px 0}
+.node{padding:10px 14px;border-radius:10px;font:600 12px/1.3 var(--mono);text-align:center;border:1px solid var(--line);background:var(--panel)}
+.node.x{border-color:#2a4a6e;color:var(--a1)} .node.y{border-color:#5a3a7e;color:var(--a2)}
+.node.z{border-color:#2a6e4a;color:var(--a3)} .node.f{background:linear-gradient(120deg,rgba(110,231,255,.12),rgba(181,123,255,.12));border-color:#3a4a6e;color:var(--ink)}
+.arrow{color:var(--dim);font:700 18px/1 var(--mono)}
+.pill{display:inline-block;font:600 11px/1 var(--mono);padding:4px 8px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--mut)}
+.progress{height:6px;border-radius:6px;background:var(--grid);overflow:hidden}
+.progress > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a1),var(--a3));transition:width .2s}
+footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px;line-height:1.7}
+.spark{color:var(--a4)}
+.topchip{position:fixed;right:14px;bottom:14px;z-index:40;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 13px;font:600 12px/1 var(--mono);color:var(--mut);display:flex;gap:9px;align-items:center;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.topchip .dotp{width:9px;height:9px;border-radius:50%;background:var(--a4);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <span class="badge">◈ recursive reasoning · in-browser lab</span>
+  <h1>TinyRecurseLab — <span class="grad">train a tiny recursive reasoner</span> that thinks in loops</h1>
+  <p class="sub">A ~17k-weight network can learn to solve Sudoku not by being big, but by <b style="color:var(--ink)">recursing</b> on a latent scratchpad — improving a draft answer over and over. That's the "Less is More" idea behind Tiny Recursive Models, which beat frontier LLMs on hard puzzles with <b style="color:var(--ink)">0.01%</b> of the parameters. Everything here is <b style="color:var(--ink)">real computation</b>: a from-scratch autograd engine trains an actual model, live, on your machine.</p>
+  <p class="cite">Grounded in: <b>Jolicoeur-Martineau, "Less is More: Recursive Reasoning with Tiny Networks"</b>, arXiv:2510.04871 (2025) · <b>Wang et&nbsp;al., "Hierarchical Reasoning Model"</b>, arXiv:2506.21734 (2025)</p>
+  <div class="statbar">
+    <div class="stat"><div class="k">7M</div><div class="l">TRM params → 45% ARC-AGI-1</div></div>
+    <div class="stat"><div class="k">2</div><div class="l">layers in the whole network</div></div>
+    <div class="stat"><div class="k">87.4%</div><div class="l">TRM on Sudoku-Extreme (HRM: 55%)</div></div>
+    <div class="stat"><div class="k">~1000</div><div class="l">training examples — no pretraining</div></div>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <div class="tab on" data-m="0"><span class="n">01</span> The Loop</div>
+  <div class="tab" data-m="1"><span class="n">02</span> Train a Reasoner</div>
+  <div class="tab" data-m="2"><span class="n">03</span> Test-Time Compute</div>
+  <div class="tab" data-m="3"><span class="n">04</span> TRM vs HRM</div>
+  <div class="tab" data-m="4"><span class="n">05</span> Adaptive Halting</div>
+  <div class="tab" data-m="5"><span class="n">06</span> Under the Hood</div>
+</nav>
+
+<!-- ============ MODULE 0 : THE LOOP ============ -->
+<section class="module on" id="m0">
+  <div class="card">
+    <h2>The recursion, step by step <span class="tag">latent refinement</span></h2>
+    <p class="lead">The model keeps two things: <b style="color:var(--a2)">y</b>, its current guess at the full solution, and <b style="color:var(--a3)">z</b>, a latent "scratchpad" of private working memory. Each improvement step re-reads the puzzle <b style="color:var(--a1)">x</b>, updates the scratchpad several times, then nudges the answer. Watch a real trained model tighten a draft into a solved grid — and watch its scratchpad churn while it "thinks."</p>
+    <div class="grid12">
+      <div>
+        <div class="panelbox">
+          <div class="mini">Puzzle → solution (confidence = brightness)</div>
+          <div class="cellwrap"><div class="sud" id="loopGrid"></div></div>
+          <div class="legend">
+            <span><span class="dot" style="background:#16203a;border:1px solid #2a3a5e"></span>given</span>
+            <span><span class="dot" style="background:var(--a3)"></span>model's answer</span>
+            <span><span class="dot" style="background:var(--bad)"></span>wrong cell</span>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn" id="loopPlay">▶ Run the loop</button>
+          <button class="btn sec" id="loopNew">New puzzle</button>
+        </div>
+        <div class="row" style="margin-top:12px;gap:16px">
+          <div class="ctl" style="flex:1"><label>Improvement step <span class="v" id="loopStepV">0</span></label>
+            <input type="range" id="loopStep" min="0" max="8" value="0" step="1"></div>
+        </div>
+      </div>
+      <div>
+        <div class="panelbox">
+          <div class="mini">z — latent scratchpad (this is where "thinking" happens)</div>
+          <canvas id="loopZ" width="520" height="120"></canvas>
+          <div class="mini" style="margin-top:14px">y — solution logits, per cell × 4 digits</div>
+          <canvas id="loopY" width="520" height="150"></canvas>
+        </div>
+        <div class="kv" style="margin-top:12px"><span>exact-match this step</span><b id="loopExact">—</b></div>
+        <div class="kv"><span>cells correct</span><b id="loopCell">—</b></div>
+        <div class="kv"><span>mean scratchpad change ‖Δz‖</span><b id="loopDz">—</b></div>
+      </div>
+    </div>
+    <div class="note" id="loopNote">Loading a trained model… the first model trains in the background in a few seconds.</div>
+  </div>
+</section>
+
+<!-- ============ MODULE 1 : TRAIN ============ -->
+<section class="module" id="m1">
+  <div class="card">
+    <h2>Train a tiny recursive reasoner <span class="tag">real backprop</span></h2>
+    <p class="lead">This trains an actual network — forward pass, cross-entropy loss, reverse-mode autodiff, Adam — entirely in your browser on freshly generated 4×4 Sudoku (each with a unique solution). Deep supervision means the loss is applied after <i>every</i> improvement step, teaching the model to make progress each loop. Change the recursion depth and watch how a deeper "thought process" changes what a tiny net can learn.</p>
+    <div class="controls">
+      <div class="ctl"><label>Recursion depth n <span class="v" id="tnV">3</span></label><input type="range" id="tn" min="1" max="6" value="3"></div>
+      <div class="ctl"><label>Supervision steps T <span class="v" id="tTV">3</span></label><input type="range" id="tT" min="1" max="5" value="3"></div>
+      <div class="ctl"><label>Hidden size <span class="v" id="thV">48</span></label><input type="range" id="th" min="16" max="80" value="48" step="8"></div>
+      <div class="ctl"><label>Learning rate <span class="v" id="tlrV">0.010</span></label><input type="range" id="tlr" min="1" max="40" value="10"></div>
+      <div class="ctl"><label>Difficulty (blanks) <span class="v" id="tbV">6</span></label><input type="range" id="tb" min="4" max="10" value="6"></div>
+      <div class="ctl"><label>Gradient</label>
+        <select id="tmode"><option value="trm">TRM (full backprop)</option><option value="hrm">HRM (1-step grad)</option></select></div>
+    </div>
+    <div class="row" style="margin-bottom:14px">
+      <button class="btn" id="trainBtn">▶ Train</button>
+      <button class="btn sec" id="pauseBtn" disabled>Pause</button>
+      <button class="btn sec" id="resetBtn">Reset</button>
+      <span class="pill" id="trainParams">params: —</span>
+      <span class="pill" id="trainSpeed">— steps/s</span>
+    </div>
+    <div class="grid2">
+      <div class="panelbox"><div class="mini">cross-entropy loss (deep supervision, log scale)</div>
+        <canvas id="lossCanvas" width="520" height="220"></canvas></div>
+      <div class="panelbox"><div class="mini">held-out accuracy (%)</div>
+        <canvas id="accCanvas" width="520" height="220"></canvas>
+        <div class="legend"><span><span class="dot" style="background:var(--a3)"></span>exact-match grid</span><span><span class="dot" style="background:var(--a1)"></span>cells correct</span></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px;align-items:flex-start;gap:20px">
+      <div class="panelbox" style="flex:0 0 auto"><div class="mini">live sample (held-out)</div>
+        <div class="cellwrap" style="width:200px"><div class="sud" id="trainSample" style="width:190px"></div></div></div>
+      <div style="flex:1;min-width:240px">
+        <div class="kv"><span>training step</span><b id="tStep">0</b></div>
+        <div class="kv"><span>loss</span><b id="tLoss">—</b></div>
+        <div class="kv"><span>held-out exact-match</span><b id="tExact">—</b></div>
+        <div class="kv"><span>held-out cell accuracy</span><b id="tCell">—</b></div>
+        <div class="note ok" id="trainNote">Press <b>Train</b>. A tiny model (~17k weights) usually cracks 30–50% exact-match on unseen puzzles within a few hundred steps — with only a couple layers, purely by looping.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MODULE 2 : TEST-TIME COMPUTE ============ -->
+<section class="module" id="m2">
+  <div class="card">
+    <h2>Test-time compute: think longer, solve more <span class="tag">recursion = compute</span></h2>
+    <p class="lead">Once trained, you can run <i>more</i> improvement steps at inference than during training. This is the recursive analogue of an LLM "thinking longer." We sweep the number of steps and measure accuracy on held-out puzzles — revealing both the gains from extra recursion and the point where a tiny model starts to <b style="color:var(--a4)">over-think</b> and drift.</p>
+    <div class="row" style="margin-bottom:14px">
+      <button class="btn" id="sweepBtn">▶ Run compute sweep</button>
+      <span class="pill" id="sweepTrained">trained budget: T=3</span>
+      <span class="pill" id="sweepStatus">needs a trained model</span>
+    </div>
+    <div class="panelbox"><div class="mini">accuracy vs. inference improvement steps</div>
+      <canvas id="sweepCanvas" width="1040" height="300"></canvas>
+      <div class="legend"><span><span class="dot" style="background:var(--a3)"></span>exact-match</span><span><span class="dot" style="background:var(--a1)"></span>cell accuracy</span><span><span class="dot" style="background:var(--a4)"></span>trained budget</span></div>
+    </div>
+    <div class="note" id="sweepNote">Tip: models trained with more supervision steps T extrapolate to more inference steps before over-thinking. Train one in the previous tab, then sweep here.</div>
+  </div>
+</section>
+
+<!-- ============ MODULE 3 : TRM vs HRM ============ -->
+<section class="module" id="m3">
+  <div class="card">
+    <h2>TRM vs HRM — why less is more <span class="tag">runnable ablation</span></h2>
+    <p class="lead">HRM used <b>two</b> networks recursing at different frequencies and a one-step gradient approximation. TRM's finding: a <b>single</b> tiny 2-layer net, back-propagated through the whole recursion, generalizes better and is far simpler. Below you can (a) train both gradient styles head-to-head, and (b) count parameters for each design.</p>
+    <div class="grid2">
+      <div>
+        <div class="mini">A · head-to-head training (same seed &amp; data)</div>
+        <div class="row" style="margin:6px 0 12px"><button class="btn pur" id="ablBtn">▶ Race TRM vs HRM</button><span class="pill" id="ablStatus">idle</span></div>
+        <div class="panelbox"><div class="mini">loss (log scale)</div>
+          <canvas id="ablCanvas" width="520" height="240"></canvas>
+          <div class="legend"><span><span class="dot" style="background:var(--a1)"></span>TRM · full backprop</span><span><span class="dot" style="background:var(--a5)"></span>HRM · 1-step gradient</span></div></div>
+        <div class="kv" style="margin-top:10px"><span>TRM final loss / exact</span><b id="ablTrm">—</b></div>
+        <div class="kv"><span>HRM final loss / exact</span><b id="ablHrm">—</b></div>
+      </div>
+      <div>
+        <div class="mini">B · parameter calculator</div>
+        <div class="controls" style="margin-top:6px">
+          <div class="ctl"><label>Width d <span class="v" id="pcW">128</span></label><input type="range" id="pcWidth" min="32" max="512" value="128" step="32"></div>
+          <div class="ctl"><label>Layers / net <span class="v" id="pcL">2</span></label><input type="range" id="pcLayers" min="1" max="8" value="2"></div>
+        </div>
+        <div class="panelbox">
+          <div class="kv"><span>TRM — 1 network × layers</span><b id="pcTrm">—</b></div>
+          <div class="kv"><span>HRM — 2 networks (H+L) × layers</span><b id="pcHrm">—</b></div>
+          <div class="kv"><span>HRM / TRM parameter ratio</span><b id="pcRatio">—</b></div>
+          <canvas id="pcBar" width="520" height="90" style="margin-top:12px"></canvas>
+        </div>
+        <div class="note">TRM keeps depth <i>inside the loop</i> instead of adding a second network — recursion supplies the effective depth, so raw parameter count stays tiny.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MODULE 4 : ACT ============ -->
+<section class="module" id="m4">
+  <div class="card">
+    <h2>Adaptive halting — spend compute where it's needed <span class="tag">ACT</span></h2>
+    <p class="lead">Not every puzzle needs the same amount of thinking. Both HRM and TRM learn an <b>adaptive computation time</b> mechanism: keep looping until the answer stops changing (or a confidence/halt signal fires), then stop. Here we halt each puzzle when its predicted grid stabilizes, and plot how many steps different difficulties actually consume. Harder puzzles (more blanks) demand more loops.</p>
+    <div class="row" style="margin-bottom:12px">
+      <button class="btn" id="actBtn">▶ Run adaptive halting</button>
+      <div class="ctl" style="min-width:200px"><label>Halt when ‖Δy‖ &lt; <span class="v" id="actThV">0.15</span></label><input type="range" id="actTh" min="2" max="60" value="15"></div>
+      <span class="pill" id="actStatus">needs a trained model</span>
+    </div>
+    <div class="grid2">
+      <div class="panelbox"><div class="mini">steps used vs difficulty (each dot = a puzzle)</div>
+        <canvas id="actScatter" width="520" height="260"></canvas></div>
+      <div class="panelbox"><div class="mini">avg steps &amp; accuracy by difficulty</div>
+        <canvas id="actBars" width="520" height="260"></canvas>
+        <div class="legend"><span><span class="dot" style="background:var(--a2)"></span>avg steps to halt</span><span><span class="dot" style="background:var(--a3)"></span>exact-match %</span></div></div>
+    </div>
+    <div class="kv" style="margin-top:12px"><span>avg steps saved vs. always-max</span><b id="actSaved">—</b></div>
+    <div class="note">This is the honest, gradient-free version of ACT: halt on solution stability. HRM instead trains a Q-head to predict "halt vs continue"; TRM uses a learned halt probability. Same goal — don't burn compute once you're confident.</div>
+  </div>
+</section>
+
+<!-- ============ MODULE 5 : UNDER THE HOOD ============ -->
+<section class="module" id="m5">
+  <div class="card">
+    <h2>Under the hood <span class="tag">verify it yourself</span></h2>
+    <p class="lead">No black boxes. The autograd engine powering every tab is ~150 lines of vanilla JS. Below you can verify its gradients against finite differences live, inspect the architecture, and see how our toy 4×4 result sits next to the paper's headline numbers.</p>
+    <div class="grid2">
+      <div>
+        <div class="mini">A · live gradient check (analytic autodiff vs finite differences)</div>
+        <div class="row" style="margin:6px 0 10px"><button class="btn" id="gcBtn">▶ Run gradient check</button><span class="pill" id="gcStatus">idle</span></div>
+        <div class="panelbox"><canvas id="gcCanvas" width="520" height="200"></canvas>
+          <div class="kv" style="margin-top:8px"><span>max relative error</span><b id="gcErr">—</b></div>
+          <div class="kv"><span>verdict</span><b id="gcVerdict">—</b></div></div>
+        <div class="note ok">A passing check (error &lt; 1e-4) means the exact same math that trains the model matches numerical calculus — the "learning" is genuine, not scripted.</div>
+      </div>
+      <div>
+        <div class="mini">B · the recursive core</div>
+        <div class="panelbox">
+          <div class="arch">
+            <div class="node x">x<br><span style="color:var(--dim);font-weight:400">puzzle</span></div><span class="arrow">+</span>
+            <div class="node y">y<br><span style="color:var(--dim);font-weight:400">answer</span></div><span class="arrow">+</span>
+            <div class="node z">z<br><span style="color:var(--dim);font-weight:400">scratchpad</span></div><span class="arrow">→</span>
+            <div class="node f">2-layer<br>MLP&nbsp;f</div><span class="arrow">→</span>
+            <div class="node z">z ← z+Δz</div>
+          </div>
+          <div style="text-align:center;color:var(--dim);font:600 11px/1.6 var(--mono);margin:6px 0">↺ recurse n times, then y ← y + Δy · repeat T times (deep supervision)</div>
+        </div>
+        <div class="mini" style="margin-top:16px">C · the paper's headline (real benchmarks)</div>
+        <table class="paper">
+          <tr><th>Model</th><th>Params</th><th>Sudoku-X</th><th>ARC-AGI-1</th></tr>
+          <tr><td>TRM</td><td>7M</td><td>87.4%</td><td>44.6%</td></tr>
+          <tr><td>HRM</td><td>27M</td><td>55.0%</td><td>40.3%</td></tr>
+          <tr><td>Deepseek R1</td><td>671B</td><td>—</td><td>15.8%</td></tr>
+          <tr><td>o3-mini-high</td><td>—</td><td>—</td><td>34.5%</td></tr>
+          <tr><td>Gemini 2.5 Pro</td><td>—</td><td>—</td><td>37.0%</td></tr>
+        </table>
+        <div class="note">Numbers from arXiv:2510.04871. This lab is a scaled-down 4×4 sandbox — same algorithm, small enough to train live in a browser tab.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <b style="color:var(--ink)">TinyRecurseLab</b> — built autonomously as an interactive explainer. Real reverse-mode autograd, real training, no libraries, no network calls. Concepts from Jolicoeur-Martineau (TRM, arXiv:2510.04871) and Wang et&nbsp;al. (HRM, arXiv:2506.21734); this 4×4 Sudoku sandbox is an original educational reimplementation, not the authors' code. MIT licensed. <span class="spark">◈</span>
+</footer>
+</div>
+<div class="topchip" id="chip"><span class="dotp"></span><span id="chipTxt">warming up model…</span></div>
